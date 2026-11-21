@@ -10,10 +10,19 @@
       : (words[0][0] + words[words.length - 1][0]).toUpperCase();
   }
 
+  function applyGreeting() {
+    const name = localStorage.getItem("moneytrack-profile-name") || "";
+    const greeting = I18n.t("goodDay");
+    $("dashboard-title").textContent = name
+      ? `${greeting.replace(" 👋", "")}, ${name} 👋`
+      : greeting;
+  }
+
   function applyProfile() {
     const name = localStorage.getItem("moneytrack-profile-name") || "";
     const initials = getInitials(name);
     $("profile-avatar").textContent = initials;
+    applyGreeting();
   }
 
   function initProfile() {
@@ -38,21 +47,6 @@
     if (!localStorage.getItem("moneytrack-profile-name")) $("profile-modal").hidden = false;
   }
 
-  function applyTheme(theme) {
-    const dark = theme === "dark";
-    document.documentElement.dataset.theme = dark ? "dark" : "light";
-    $("theme-icon").textContent = dark ? "☀" : "☾";
-    document.querySelector('meta[name="theme-color"]').setAttribute("content", dark ? "#111827" : "#f5f7fb");
-  }
-
-  function initTheme() {
-    applyTheme(localStorage.getItem("moneytrack-theme") || "light");
-    $("theme-toggle").addEventListener("click", () => {
-      const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-      localStorage.setItem("moneytrack-theme", next);
-      applyTheme(next);
-    });
-  }
 
   function showToast(message, type) {
     const toast = document.createElement("div");
@@ -85,7 +79,6 @@
 
   async function start() {
     I18n.apply();
-    initTheme();
     initProfile();
     $("language-select").value = I18n.language;
     document.querySelectorAll("[data-tab]").forEach(button => button.addEventListener("click", () => setTab(button.dataset.tab)));
@@ -93,6 +86,7 @@
     $("language-select").addEventListener("change", event => {
       I18n.setLanguage(event.target.value);
       I18n.apply();
+      applyGreeting();
       renderAll();
     });
     window.addEventListener("online", updateConnection);
