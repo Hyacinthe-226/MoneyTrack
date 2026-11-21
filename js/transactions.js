@@ -2,6 +2,7 @@
   const I18n = window.MoneyTrackI18n;
   const colors = ["#4c6fe8", "#18a878", "#ee8974", "#8e72df", "#e7b44f", "#45a9ba", "#e077a2", "#98a4b8"];
   const categoryIcons = { food: "pie", transport: "arrows", communication: "globe", health: "shield", education: "chart", leisure: "award", shopping: "wallet", otherExpense: "arrows", salary: "arrow-down", business: "chart", services: "award", otherIncome: "arrow-down" };
+  const amountFrames = new WeakMap();
   const $ = id => document.getElementById(id);
 
   function amount(value) {
@@ -17,6 +18,26 @@
   }
   function formatAmount(value) { return amount(value); }
   function shortDate(value) { return dateLabel(value, { day: "numeric", month: "short" }); }
+  function animateAmount(element, value) {
+    const target = Math.round(value);
+    const previousFrame = amountFrames.get(element);
+    if (previousFrame) cancelAnimationFrame(previousFrame);
+    const startValue = Number(element.dataset.amountValue || 0);
+    const startedAt = performance.now();
+    const duration = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 280;
+    element.dataset.amountValue = String(target);
+    if (!duration) {
+      element.textContent = amount(target);
+      return;
+    }
+    const step = now => {
+      const progress = Math.min(1, (now - startedAt) / duration);
+      element.textContent = amount(startValue + (target - startValue) * progress);
+      if (progress < 1) amountFrames.set(element, requestAnimationFrame(step));
+      else amountFrames.delete(element);
+    };
+    amountFrames.set(element, requestAnimationFrame(step));
+  }
 
   function updateCategoryOptions(selected) {
     const type = document.querySelector('input[name="transaction-type"]:checked').value;
@@ -124,11 +145,12 @@
     $("category-filter").addEventListener("change", render);
     $("transaction-form").addEventListener("submit", async event => {
       event.preventDefault();
+      if ($("transaction-form").dataset.saving === "true") return;
       $("form-error").textContent = "";
       $("amount-error").textContent = "";
       const value = Number($("transaction-amount").value);
       const date = $("transaction-date").value;
-      if (!Number.isFinite(value) || value <= 0) {
+      if (!Number.isSafeInteger(value) || value <= 0) {
         $("amount-error").textContent = I18n.t("invalidAmount");
         $("transaction-amount").focus();
         return;
@@ -146,8 +168,14 @@
         category: $("transaction-category").value, date,
         createdAt: previous ? previous.createdAt : Date.now(), updatedAt: Date.now()
       };
+      const form = $("transaction-form");
+      const submitButton = form.querySelector('button[type="submit"]');
+      form.dataset.saving = "true";
+      submitButton.disabled = true;
       try {
         await window.MoneyTrackDB.save(transaction);
+        await window.MoneyTrackDB.queueOutbox({ id: `save-${transaction.id}`, action: "save", transaction });
+        if (navigator.onLine) { try { await window.MoneyTrackDB.flushOutbox(); } catch (error) { console.warn("MoneyTrack sync is pending.", error); } }
         window.MoneyTrack.state.transactions = await window.MoneyTrackDB.getAll();
         closeModal();
         window.MoneyTrack.renderAll();
@@ -155,6 +183,9 @@
       } catch (error) {
         console.error("MoneyTrack could not save a transaction.", error);
         $("form-error").textContent = I18n.t("saveError");
+      } finally {
+        form.dataset.saving = "false";
+        submitButton.disabled = false;
       }
     });
     $("transactions-list").addEventListener("click", async event => {
@@ -169,6 +200,8 @@
         if (!item || !window.confirm(I18n.t("deleteConfirm"))) return;
         try {
           await window.MoneyTrackDB.remove(item.id);
+          await window.MoneyTrackDB.queueOutbox({ id: `delete-${item.id}`, action: "delete", transaction: { id: item.id } });
+          if (navigator.onLine) { try { await window.MoneyTrackDB.flushOutbox(); } catch (error) { console.warn("MoneyTrack sync is pending.", error); } }
           window.MoneyTrack.state.transactions = await window.MoneyTrackDB.getAll();
           window.MoneyTrack.renderAll();
           window.MoneyTrack.showToast(I18n.t("deleted"), "success");
@@ -180,5 +213,5 @@
     });
   }
 
-  window.MoneyTrackTransactions = { init, render, openModal, formatAmount, shortDate, categoryLabel, colors };
+  window.MoneyTrackTransactions = { init, render, openModal, formatAmount, animateAmount, shortDate, categoryLabel, colors };
 })();

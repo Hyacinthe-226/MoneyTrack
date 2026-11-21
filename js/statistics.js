@@ -55,8 +55,8 @@
   function renderComparison(entries) {
     const incomes = sum(entries.filter(item => item.type === "income"));
     const expenses = sum(entries.filter(item => item.type === "expense"));
-    $("stats-income").textContent = window.MoneyTrackTransactions.formatAmount(incomes);
-    $("stats-expenses").textContent = window.MoneyTrackTransactions.formatAmount(expenses);
+    window.MoneyTrackTransactions.animateAmount($("stats-income"), incomes);
+    window.MoneyTrackTransactions.animateAmount($("stats-expenses"), expenses);
     const empty = entries.length === 0;
     $("statistics-comparison-empty").hidden = !empty;
     const data = { labels: [I18n.t("chartIncome"), I18n.t("chartExpenses")], datasets: [{

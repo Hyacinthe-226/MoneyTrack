@@ -1,4 +1,4 @@
-const CACHE_NAME = "moneytrack-v1";
+const CACHE_NAME = "moneytrack-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -30,13 +30,23 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   const request = event.request;
   if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
-  event.respondWith(caches.match(request).then(cached => cached || fetch(request).then(response => {
-    if (!response || !response.ok) return response;
-    const copy = response.clone();
-    event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(request, copy)));
-    return response;
-  }).catch(() => {
-    if (request.mode === "navigate") return caches.match("./index.html");
-    throw new Error("This MoneyTrack resource is unavailable offline.");
-  })));
+  if (request.mode === "navigate") {
+    event.respondWith(fetch(request).then(response => {
+      if (response && response.ok) {
+        const copy = response.clone();
+        event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(request, copy)));
+        return response;
+      }
+      return caches.match("./index.html");
+    }).catch(() => caches.match("./index.html")));
+    return;
+  }
+  event.respondWith(fetch(request).then(response => {
+    if (response && response.ok) {
+      const copy = response.clone();
+      event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(request, copy)));
+      return response;
+    }
+    return caches.match(request);
+  }).catch(() => caches.match(request).then(cached => cached || Response.error())));
 });

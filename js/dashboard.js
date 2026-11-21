@@ -32,8 +32,12 @@
   function updateTrend() {
     const now = new Date();
     const currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const previousStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const current = total(all().filter(item => item.type === "expense" && new Date(item.date + "T12:00:00") >= currentStart));
+    const current = total(all().filter(item => {
+      const date = new Date(item.date + "T12:00:00");
+      return item.type === "expense" && date >= currentStart && date < nextStart;
+    }));
     const previous = total(all().filter(item => {
       const date = new Date(item.date + "T12:00:00");
       return item.type === "expense" && date >= previousStart && date < currentStart;
@@ -51,9 +55,9 @@
     const transactions = all();
     const incomes = transactions.filter(item => item.type === "income");
     const expenses = transactions.filter(item => item.type === "expense");
-    $("dashboard-balance").textContent = window.MoneyTrackTransactions.formatAmount(total(incomes) - total(expenses));
-    $("dashboard-income").textContent = window.MoneyTrackTransactions.formatAmount(total(incomes));
-    $("dashboard-expenses").textContent = window.MoneyTrackTransactions.formatAmount(total(expenses));
+    window.MoneyTrackTransactions.animateAmount($("dashboard-balance"), total(incomes) - total(expenses));
+    window.MoneyTrackTransactions.animateAmount($("dashboard-income"), total(incomes));
+    window.MoneyTrackTransactions.animateAmount($("dashboard-expenses"), total(expenses));
     updateTrend();
     drawChart(expenses);
     const now = new Date();
